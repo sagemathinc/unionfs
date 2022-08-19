@@ -1,6 +1,6 @@
 {
   "name": "@wapython/unionfs",
-  "version": "4.5.0",
+  "version": "4.5.2",
   "description": "Use multiple `fs` modules in a union.",
   "main": "lib/index.js",
   "types": "lib/index.d.ts",
@@ -14,9 +14,7 @@
     "many file systems",
     "multiple"
   ],
-  "files": [
-    "lib"
-  ],
+  "files": ["lib/*", "README.md", "package.json"],
   "repository": {
     "type": "git",
     "url": "https://github.com/sagemathinc/unionfs"
@@ -51,20 +49,13 @@
     "typescript": "^4.7.4"
   },
   "jest": {
-    "moduleFileExtensions": [
-      "ts",
-      "tsx",
-      "js",
-      "jsx"
-    ],
+    "moduleFileExtensions": ["ts", "tsx", "js", "jsx"],
     "testEnvironment": "node",
     "transformIgnorePatterns": [],
     "transform": {
       "^.+\\.tsx?$": "ts-jest"
     },
-    "testMatch": [
-      "**/src/__tests__/**/*.ts?(x)"
-    ]
+    "testMatch": ["**/src/__tests__/**/*.ts?(x)"]
   },
   "release": {
     "verifyConditions": [
