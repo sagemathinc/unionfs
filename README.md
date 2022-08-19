@@ -1,8 +1,7 @@
 # unionfs
 
-**NOTE:** This is a fork of https://www.npmjs.com/package/unionfs, since the last published version
-on npm (4.4.0) has at least one major bug, and it hasn't been updated in years.  The bug was fixed 
-in the upstream github repo though.
+**NOTE:** This is a fork of https://www.npmjs.com/package/unionfs, since it has a significant bug, 
+and it hasn't been updated in years.  The bug is also not fixed in the upstream github repo though.
 
 Creates a union of multiple `fs` file systems.
 

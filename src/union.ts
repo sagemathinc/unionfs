@@ -223,18 +223,27 @@ export class Union {
   public readdirSync = (...args): Array<readdirEntry> => {
     let lastError: IUnionFsError | null = null;
     let result = new Map<string, readdirEntry>();
+    let pathExists = false;
     for (let i = this.fss.length - 1; i >= 0; i--) {
       const fs = this.fss[i];
       try {
-        if (!fs.readdirSync) throw Error(`Method not supported: "readdirSync" with args "${args}"`);
+        if (!fs.readdirSync)
+          throw Error(
+            `Method not supported: "readdirSync" with args "${args}"`
+          );
         for (const res of fs.readdirSync.apply(fs, args)) {
           result.set(this.pathFromReaddirEntry(res), res);
         }
+        pathExists = true;
       } catch (err) {
         err.prev = lastError;
         lastError = err;
-        if (result.size === 0 && !i) {
-          // last one
+        if (!i && !pathExists) {
+          // Last one and the path didn't exist in any case above.
+          // NOTE: In upstream this function has a bug when there's 2 filesystems with this.fss[1] having the
+          // directory but it is empty and this.fss[0] not having the directory.  In that case checking the
+          // size doesn't work to know if the directory exists.  In particular, the fix at
+          // https://github.com/streamich/unionfs/pull/348 is incorrect.
           throw err;
         } else {
           // Ignore error...
