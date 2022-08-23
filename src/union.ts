@@ -20,6 +20,8 @@ const SPECIAL_METHODS = new Set([
   "unwatchFile",
 ]);
 
+const SPECIAL_ERRORS = new Set(["ENOTDIR", "EEXIST"]);
+
 const createFSProxy = (watchers: FSWatcher[]) =>
   new Proxy(
     {},
@@ -182,7 +184,7 @@ export class Union {
     let pathExists = false;
     const iterate = (i = 0, error?: IUnionFsError | null) => {
       if (error) {
-        if (error["code"] === "ENOTDIR") {
+        if (SPECIAL_ERRORS.has(error["code"])) {
           // Immediately fail with this error.
            // see comment in readdirSync
           if (cb) {
@@ -254,8 +256,9 @@ export class Union {
         }
         pathExists = true;
       } catch (err) {
-        if (err.code === "ENOTDIR") {
-          // The file *does* exist in this filesystem in the union, but an ENOTDIR error happened.
+        if (SPECIAL_ERRORS.has(err.code)) {
+          // The file *does* exist in this filesystem in the union, but an ENOTDIR or EEXIST error happened
+          // (or anything in SPECIAL_ERRORS).
           // E.g., if you try to get a directory listing on a file one fs doesn't have the file and the
           // the other fs has the file, then the one that has it throws ENOTDIR, which is what this
           // function should throw.  I hit this problem when working the cpython unit tests
@@ -400,7 +403,7 @@ export class Union {
           throw Error(`Method not supported: "${method}" with args "${args}"`);
         return fs[method].apply(fs, args);
       } catch (err) {
-        if (err["code"] === "ENOTDIR") { // see comment in readdirSync
+        if (SPECIAL_ERRORS.has(err["code"])) { // see comment in readdirSync
           throw err;
         }
         err.prev = lastError;
@@ -426,7 +429,7 @@ export class Union {
 
     let lastError: IUnionFsError | null = null;
     const iterate = (i = 0, err?: IUnionFsError) => {
-      if (err != null && err?.["code"] === "ENOTDIR") {  // see comment in readdirSync
+      if (err != null && SPECIAL_ERRORS.has(err?.["code"])) {  // see comment in readdirSync
         if(cb) {
           cb(err);
         }
