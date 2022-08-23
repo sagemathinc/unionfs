@@ -1,7 +1,7 @@
-import { FSWatcher, Dirent } from 'fs';
-import { IFS } from './fs';
-import { Readable, Writable } from 'stream';
-const { fsAsyncMethods, fsSyncMethods } = require('fs-monkey/lib/util/lists');
+import { FSWatcher, Dirent } from "fs";
+import { IFS } from "./fs";
+import { Readable, Writable } from "stream";
+const { fsAsyncMethods, fsSyncMethods } = require("fs-monkey/lib/util/lists");
 
 export interface IUnionFsError extends Error {
   prev?: IUnionFsError | null;
@@ -10,14 +10,14 @@ export interface IUnionFsError extends Error {
 type readdirEntry = string | Buffer | Dirent;
 
 const SPECIAL_METHODS = new Set([
-  'existsSync',
-  'readdir',
-  'readdirSync',
-  'createReadStream',
-  'createWriteStream',
-  'watch',
-  'watchFile',
-  'unwatchFile',
+  "existsSync",
+  "readdir",
+  "readdirSync",
+  "createReadStream",
+  "createWriteStream",
+  "watch",
+  "watchFile",
+  "unwatchFile",
 ]);
 
 const createFSProxy = (watchers: FSWatcher[]) =>
@@ -30,7 +30,7 @@ const createFSProxy = (watchers: FSWatcher[]) =>
         for (const watcher of watchers) {
           prop = watcher[property];
           // if we're a function we wrap it in a bigger caller;
-          if (typeof prop === 'function') {
+          if (typeof prop === "function") {
             funcCallers.push([watcher, prop]);
           }
         }
@@ -45,35 +45,35 @@ const createFSProxy = (watchers: FSWatcher[]) =>
           return prop;
         }
       },
-    },
+    }
   );
 
 const fsPromisesMethods = [
-  'access',
-  'copyFile',
-  'open',
-  'opendir',
-  'rename',
-  'truncate',
-  'rmdir',
-  'mkdir',
-  'readdir',
-  'readlink',
-  'symlink',
-  'lstat',
-  'stat',
-  'link',
-  'unlink',
-  'chmod',
-  'lchmod',
-  'lchown',
-  'chown',
-  'utimes',
-  'realpath',
-  'mkdtemp',
-  'writeFile',
-  'appendFile',
-  'readFile',
+  "access",
+  "copyFile",
+  "open",
+  "opendir",
+  "rename",
+  "truncate",
+  "rmdir",
+  "mkdir",
+  "readdir",
+  "readlink",
+  "symlink",
+  "lstat",
+  "stat",
+  "link",
+  "unlink",
+  "chmod",
+  "lchmod",
+  "lchown",
+  "chown",
+  "utimes",
+  "realpath",
+  "mkdtemp",
+  "writeFile",
+  "appendFile",
+  "readFile",
 ] as const;
 
 /**
@@ -82,8 +82,10 @@ const fsPromisesMethods = [
 export class Union {
   private fss: IFS[] = [];
 
-  public ReadStream: typeof Readable | (new (...args: any[]) => Readable) = Readable;
-  public WriteStream: typeof Writable | (new (...args: any[]) => Writable) = Writable;
+  public ReadStream: typeof Readable | (new (...args: any[]) => Readable) =
+    Readable;
+  public WriteStream: typeof Writable | (new (...args: any[]) => Writable) =
+    Writable;
 
   private promises: {} = {};
 
@@ -102,7 +104,7 @@ export class Union {
     }
 
     for (let method of fsPromisesMethods) {
-      if (method === 'readdir') {
+      if (method === "readdir") {
         this.promises[method] = this.readdirPromise;
 
         continue;
@@ -170,7 +172,7 @@ export class Union {
   public readdir = (...args): void => {
     let lastarg = args.length - 1;
     let cb = args[lastarg];
-    if (typeof cb !== 'function') {
+    if (typeof cb !== "function") {
       cb = null;
       lastarg++;
     }
@@ -180,6 +182,14 @@ export class Union {
     let pathExists = false;
     const iterate = (i = 0, error?: IUnionFsError | null) => {
       if (error) {
+        if (error["code"] !== "ENOENT") {
+          // Immediately fail with this error.
+           // see comment in readdirSync
+          if (cb) {
+            cb(error);
+          }
+          return;
+        }
         error.prev = lastError;
         lastError = error;
       }
@@ -188,10 +198,10 @@ export class Union {
       if (i >= this.fss.length) {
         // last one
         if (cb) {
-          if(pathExists) {
+          if (pathExists) {
             cb(null, this.sortedArrayFromReaddirResult(result));
           } else {
-            cb(error || Error('No file systems attached.'));
+            cb(error || Error("No file systems attached."));
           }
         }
         return;
@@ -199,7 +209,7 @@ export class Union {
 
       // Replace `callback` with our intermediate function.
       args[lastarg] = (err, resArg: readdirEntry[]) => {
-        if(!err) {
+        if (!err) {
           pathExists = true;
         }
         if (result.size === 0 && err) {
@@ -222,7 +232,7 @@ export class Union {
       const fs = this.fss[j];
       const func = fs.readdir;
 
-      if (!func) iterate(i + 1, Error('Method not supported: readdir'));
+      if (!func) iterate(i + 1, Error("Method not supported: readdir"));
       else func.apply(fs, args);
     };
     iterate();
@@ -244,6 +254,16 @@ export class Union {
         }
         pathExists = true;
       } catch (err) {
+        if (err.code !== "ENOENT") {
+          // The file *does* exist in this filesystem in the union, but some *other* error happened.
+          // E.g., if you try to get a directory listing on a file one fs doesn't have the file and the
+          // the other fs has the file, then the one that has it throws ENOTDIR, which is what this
+          // function should throw.  I hite this exact problem when working the cpython unit tests
+          // for Lib/test/test_exceptions.py, which check the error code when trying to get a directory
+          // listing on a file.
+          throw err;
+        }
+
         err.prev = lastError;
         lastError = err;
         if (!i && !pathExists) {
@@ -269,7 +289,9 @@ export class Union {
       const fs = this.fss[i];
       try {
         if (!fs.promises || !fs.promises.readdir)
-          throw Error(`Method not supported: "readdirSync" with args "${args}"`);
+          throw Error(
+            `Method not supported: "readdirSync" with args "${args}"`
+          );
         for (const res of await fs.promises.readdir.apply(fs, args)) {
           result.set(this.pathFromReaddirEntry(res), res);
         }
@@ -289,13 +311,15 @@ export class Union {
   };
 
   private pathFromReaddirEntry = (readdirEntry: readdirEntry): string => {
-    if (readdirEntry instanceof Buffer || typeof readdirEntry === 'string') {
+    if (readdirEntry instanceof Buffer || typeof readdirEntry === "string") {
       return String(readdirEntry);
     }
     return readdirEntry.name;
   };
 
-  private sortedArrayFromReaddirResult = (readdirResult: Map<string, readdirEntry>): readdirEntry[] => {
+  private sortedArrayFromReaddirResult = (
+    readdirResult: Map<string, readdirEntry>
+  ): readdirEntry[] => {
     const array: readdirEntry[] = [];
     for (const key of Array.from(readdirResult.keys()).sort()) {
       const value = readdirResult.get(key);
@@ -308,7 +332,8 @@ export class Union {
     let lastError = null;
     for (const fs of this.fss) {
       try {
-        if (!fs.createReadStream) throw Error(`Method not supported: "createReadStream"`);
+        if (!fs.createReadStream)
+          throw Error(`Method not supported: "createReadStream"`);
 
         if (fs.existsSync && !fs.existsSync(path)) {
           throw new Error(`file "${path}" does not exists`);
@@ -316,7 +341,7 @@ export class Union {
 
         const stream = fs.createReadStream(path);
         if (!stream) {
-          throw new Error('no valid stream');
+          throw new Error("no valid stream");
         }
         this.ReadStream = fs.ReadStream;
 
@@ -333,13 +358,14 @@ export class Union {
     let lastError = null;
     for (const fs of this.fss) {
       try {
-        if (!fs.createWriteStream) throw Error(`Method not supported: "createWriteStream"`);
+        if (!fs.createWriteStream)
+          throw Error(`Method not supported: "createWriteStream"`);
 
         fs.statSync(path); //we simply stat first to exit early for mocked fs'es
         //TODO which filesystem to write to?
         const stream = fs.createWriteStream(path);
         if (!stream) {
-          throw new Error('no valid stream');
+          throw new Error("no valid stream");
         }
         this.WriteStream = fs.WriteStream;
 
@@ -370,9 +396,13 @@ export class Union {
     for (let i = this.fss.length - 1; i >= 0; i--) {
       const fs = this.fss[i];
       try {
-        if (!fs[method]) throw Error(`Method not supported: "${method}" with args "${args}"`);
+        if (!fs[method])
+          throw Error(`Method not supported: "${method}" with args "${args}"`);
         return fs[method].apply(fs, args);
       } catch (err) {
+        if (err["code"] !== "ENOENT") { // see comment in readdirSync
+          throw err;
+        }
         err.prev = lastError;
         lastError = err;
         if (!i) {
@@ -389,13 +419,19 @@ export class Union {
   private asyncMethod(method: string, args: any[]) {
     let lastarg = args.length - 1;
     let cb = args[lastarg];
-    if (typeof cb !== 'function') {
+    if (typeof cb !== "function") {
       cb = null;
       lastarg++;
     }
 
     let lastError: IUnionFsError | null = null;
     const iterate = (i = 0, err?: IUnionFsError) => {
+      if (err != null && err?.["code"] !== "ENOENT") {  // see comment in readdirSync
+        if(cb) {
+          cb(err);
+        }
+        return;
+      }
       if (err) {
         err.prev = lastError;
         lastError = err;
@@ -404,7 +440,7 @@ export class Union {
       // Already tried all file systems, return the last error.
       if (i >= this.fss.length) {
         // last one
-        if (cb) cb(err || Error('No file systems attached.'));
+        if (cb) cb(err || Error("No file systems attached."));
         return;
       }
 
@@ -418,7 +454,7 @@ export class Union {
       const fs = this.fss[j];
       const func = fs[method];
 
-      if (!func) iterate(i + 1, Error('Method not supported: ' + method));
+      if (!func) iterate(i + 1, Error("Method not supported: " + method));
       else func.apply(fs, args);
     };
     iterate();
@@ -434,7 +470,11 @@ export class Union {
 
       try {
         if (!promises || !promises[method]) {
-          throw Error(`Promise of method not supported: "${String(method)}" with args "${args}"`);
+          throw Error(
+            `Promise of method not supported: "${String(
+              method
+            )}" with args "${args}"`
+          );
         }
 
         // return promises[method](...args);
