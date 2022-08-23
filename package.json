@@ -1,6 +1,6 @@
 {
   "name": "@wapython/unionfs",
-  "version": "4.5.5",
+  "version": "4.5.6",
   "description": "Use multiple `fs` modules in a union.",
   "main": "lib/index.js",
   "types": "lib/index.d.ts",
